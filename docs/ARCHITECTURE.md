@@ -1,111 +1,95 @@
-# User Management Application Architecture
+# Architecture Design for User Management Application
+
+## Project Overview
+This document outlines the architecture for a user management application built with Python's FastAPI framework. The application implements JWT authentication and provides CRUD operations for user management, with SQLite as the storage solution.
 
 ## Project Layout
-
 ```
 user-management-demo/
 │
 ├── app/
-│   ├── main.py               # Main application entry point
-│   ├── models.py             # Database models
-│   ├── schemas.py            # Pydantic schemas for validation
-│   ├── routers/              # Directory for API route definitions
-│   │   ├── auth.py           # Authentication routes
-│   │   └── users.py          # User management routes
-│   └── database.py           # Database connection and setup
+│   ├── main.py            # Entry point for the FastAPI application
+│   ├── models.py          # Contains database models (SQLAlchemy)
+│   ├── schemas.py         # Contains Pydantic schemas for request/response validation
+│   ├── routers/           # Contains route handlers for different entities
+│   │   └── users.py       # User-related endpoints
+│   ├── database.py        # Database connection and session management
+│   └── utils.py           # Utility functions, e.g., for JWT handling
 │
 ├── docs/
-│   └── ARCHITECTURE.md       # Architecture documentation
+│   └── ARCHITECTURE.md    # Detailed architecture document
 │
-└── requirements.txt          # Project dependencies
+└── requirements.txt        # Python dependencies
 ```
 
 ## Data Models
+Using SQLAlchemy, the following models will be defined in `models.py`:
 
-We will use SQLAlchemy to define our database models:
-
-### User
-- `id`: Integer (Primary Key)
-- `email`: String (Unique)
-- `hashed_password`: String
-- `created_at`: DateTime
-- `updated_at`: DateTime
-
-#### `models.py`
+### User Model
 ```python
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
-
-Base = declarative_base()
+from sqlalchemy import Column, Integer, String
+from database import Base
 
 class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-```
+    email = Column(String, unique=True, index=True)
+    full_name = Column(String, index=True)
+```  
 
 ## Pydantic Schemas
+In `schemas.py`, we will define the following Pydantic models for data validation:
 
-We will use Pydantic for data validation and serialization:
-
-#### `schemas.py`
+### User Schemas
 ```python
 from pydantic import BaseModel
-from datetime import datetime
+from typing import Optional
 
 class UserCreate(BaseModel):
+    username: str
     email: str
+    full_name: Optional[str] = None
     password: str
 
-class UserResponse(BaseModel):
+class UserInDB(UserCreate):
     id: int
+
+class UserOut(BaseModel):
+    id: int
+    username: str
     email: str
-    created_at: datetime
-    updated_at: datetime
+    full_name: Optional[str] = None
 
     class Config:
-        orm_mode = True  # Enables compatibility with SQLAlchemy models
+        orm_mode = True
 ```
 
 ## API Endpoints
-
-Here’s a proposed list of API endpoints:
-
-### Authentication Endpoints (in `auth.py`)
-- **POST /auth/login**: Login user and return JWT token.
-- **POST /auth/register**: Register a new user.
-
-### User Management Endpoints (in `users.py`)
-- **GET /users**: Retrieve all users.
-- **GET /users/{user_id}**: Retrieve a specific user by ID.
-- **PUT /users/{user_id}**: Update user information.
-- **DELETE /users/{user_id}**: Delete a user.
+The following CRUD operations will be implemented for users in `routers/users.py`:
+- **POST /users**: Create a new user.
+- **GET /users/{user_id}**: Retrieve a user by ID.
+- **PUT /users/{user_id}**: Update a user by ID.
+- **DELETE /users/{user_id}**: Delete a user by ID.
+- **GET /users**: List all users.
 
 ## JWT Authentication
+Utility functions in `utils.py` will manage JWT token creation and validation. Certain endpoints will require authentication:
+- User creation might be open, but subsequent user management operations will likely require authentication.
 
-- Use `pyjwt` for token creation and validation.
-- Token will be required for routes that modify user data and will be included in the headers as `Authorization: Bearer <token>`.
-
-## Database Setup
-
-#### `database.py`
-```python
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-DATABASE_URL = "sqlite:///./users.db"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
+## Dependencies
+The following are the necessary Python dependencies for the project, which will be listed in `requirements.txt`:
 ```
+fastapi
+uvicorn
+sqlalchemy
+sqlite
+passlib[bcrypt]    # For password hashing
+pydantic
+python-jose        # For JWT
+```
+
+## Conclusion
+This architecture design provides a solid foundation for the user management application, with clear project structure, data models, and planned API endpoints for managing user accounts.
